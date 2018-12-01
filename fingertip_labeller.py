@@ -6,7 +6,7 @@
 import csv
 import numpy as np
 import cv2
-
+import argparse
 import utils
 
 
@@ -172,20 +172,29 @@ def manual_edit(image, bounding_boxes):
             break
     return bounding_boxes
 
-
 if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-n", "--num", type=int, required=False, default=2, help="starting image index")
+    args = ap.parse_args()
+    assert args.num >= 2
+    start = False
+
     filenames = []
     with open('11k_hands/HandInfo.csv', newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
         next(reader) # skip header
         for row in reader:
-            aspect = row[6]
-            if "dorsal" in aspect:
-                filenames.append("11k_hands/Hands/"+row[7])
+            file = row[7]
+            index = int(file[len("Hand_"): -len(".jpg")])
+            if index >= args.num:
+                start = True
+            if start:
+                aspect = row[6]
+                if "dorsal" in aspect:
+                    filenames.append("11k_hands/Hands/" + file)
 
     print("q to quit, e to edit, any other button for next image")
     print("editing mode: drag boxes with mouse. r to reset, enter to submit changes")
-    print("TODO: start from any index")
     for file in filenames:
         raw = cv2.imread(file)
         raw = utils.resize(raw, width=400)
