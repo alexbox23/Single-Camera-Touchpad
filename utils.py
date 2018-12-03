@@ -1,11 +1,15 @@
-# adapted from the imutils library
-# author:    Adrian Rosebrock
-# website:   http://www.pyimagesearch.com
+""" Single-Camera-Touchpad/utils.py
 
-# import the necessary packages
+    Utility methods for this project.
+"""
+
 import numpy as np
 import cv2
+import tensorflow as tf
 
+# from the imutils library
+# author:    Adrian Rosebrock
+# website:   http://www.pyimagesearch.com
 def resize(image, width=None, height=None, inter=cv2.INTER_AREA):
     # initialize the dimensions of the image to be resized and
     # grab the image size
@@ -36,3 +40,20 @@ def resize(image, width=None, height=None, inter=cv2.INTER_AREA):
 
     # return the resized image
     return resized
+
+# Wrappers for inserting features into Example proto.
+# from tensorflow repo: object_detection/utils/dataset_util.py
+def int64_feature(value):
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+
+def int64_list_feature(value):
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
+
+def bytes_feature(value):
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+
+def bytes_list_feature(value):
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
+
+def float_list_feature(value):
+    return tf.train.Feature(float_list=tf.train.FloatList(value=value))

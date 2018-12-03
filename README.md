@@ -2,9 +2,9 @@
 
 todo:
 
-write script to label dorsal fingertips on 11k hands
-train YOLO on 11k hands
-fast streaming from pi to laptop
+export tfrecords
+train ssd_mobilenet on 11k hands
+KCF/MOSSE tracking
 calibration script for finger color
 ransac for homography
 final app
