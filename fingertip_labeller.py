@@ -108,6 +108,8 @@ def find_fingertips(image, threshold=5, finger_angle=5, tip_radius=25):
     for indices in cnt_indices:
         cnt = contours[indices]
         x, y, w, h = cv2.boundingRect(cnt)
+        w = max(w, tip_radius)
+        h = max(h, tip_radius)
         if h < w:
             y -= (w - h)
             h = w
@@ -306,6 +308,7 @@ if __name__ == "__main__":
         tf_example = create_tf_example(raw, file, bounding_boxes)
         example_list.append(tf_example)
 
+    print("{0} examples created.".format(len(example_list)))
     random.seed(2018)
     random.shuffle(example_list)
     train_list, val_list = np.split(example_list, [int(len(example_list) * args.split)])
