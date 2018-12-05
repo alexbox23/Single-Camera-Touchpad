@@ -247,7 +247,8 @@ if __name__ == "__main__":
             elif file == last_labelled:
                 start = True
 
-    with open(output_path, 'a', newline='') as csvfile:
+    mode = 'w' if start else 'a'
+    with open(output_path, mode, newline='') as csvfile:
         writer = csv.writer(csvfile, delimiter=',')
 
         print("q to quit, e to edit, any other key for next image")
