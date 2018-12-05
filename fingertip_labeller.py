@@ -109,17 +109,12 @@ def find_fingertips(image, threshold=5, finger_angle=5, tip_radius=25):
         cnt = contours[indices]
         x, y, w, h = cv2.boundingRect(cnt)
 
-        if w < tip_radius:
-            x -= (tip_radius - w)
-            w = tip_radius
-        elif w > 2 * tip_radius:
-            w = 2 * tip_radius
         if h < tip_radius:
             y -= (tip_radius - h)
             h = tip_radius
-        elif h > 2 * tip_radius:
-            h = 2 * tip_radius
-
+        elif h > tip_radius * 3//2:
+            h = tip_radius * 3//2
+        w = max(tip_radius, min(tip_radius * 3//2, w))
         x = max(0, min(width - w, x))
         y = max(0, min(height - h, y))
 
@@ -141,7 +136,7 @@ def manual_edit(image, bounding_boxes):
 
     image = image.copy()
     def click_and_crop(event, x, y, flags, param):
-        nonlocal refPt, moving, sel_rect_endpoint
+        nonlocal refPt, moving, resizing, new_pos, new_size, sel_rect_endpoint
 
         if event == cv2.EVENT_LBUTTONDOWN:
             refPt = [(x, y)]
@@ -151,8 +146,19 @@ def manual_edit(image, bounding_boxes):
         elif event == cv2.EVENT_LBUTTONUP:
             refPt.append((x, y))
             moving = False
+            new_pos = True
 
-        elif event == cv2.EVENT_MOUSEMOVE and moving:
+        elif event == cv2.EVENT_RBUTTONDOWN:
+            refPt = [(x, y)]
+            resizing = True
+            sel_rect_endpoint = []
+
+        elif event == cv2.EVENT_RBUTTONUP:
+            refPt.append((x, y))
+            resizing = False
+            new_size = True
+
+        elif event == cv2.EVENT_MOUSEMOVE and (resizing or moving):
             sel_rect_endpoint = [(x, y)]
 
     clone = image.copy()
@@ -163,6 +169,9 @@ def manual_edit(image, bounding_boxes):
 
     refPt = []
     moving = False
+    resizing = False
+    new_pos = False
+    new_size = False
     sel_rect_endpoint = []
     dragging_box = -1
 
@@ -170,11 +179,19 @@ def manual_edit(image, bounding_boxes):
     cv2.setMouseCallback("manual_edit", click_and_crop)
 
     while True:
-        if not moving:
+        if not moving and not resizing:
             if len(refPt) == 2 and dragging_box != -1:
                 x, y, w, h = bounding_boxes[dragging_box]
-                x += refPt[1][0] - refPt[0][0]
-                y += refPt[1][1] - refPt[0][1]
+                dx = refPt[1][0] - refPt[0][0]
+                dy = refPt[1][1] - refPt[0][1]
+                if new_pos:
+                    x += dx
+                    y += dy
+                    new_pos = False
+                elif new_size:
+                    w += dx
+                    h += dy
+                    new_size = False
                 bounding_boxes[dragging_box] = [x, y, w, h]
                 dragging_box = -1
 
@@ -183,18 +200,23 @@ def manual_edit(image, bounding_boxes):
                     x, y, w, h = box
                     cv2.rectangle(image, (x, y), (x+w, y+h), (0, 0, 0), 1)
             cv2.imshow("manual_edit", image)
-        elif moving:
+        else:
             for i in range(len(bounding_boxes)):
                 x, y, w, h = bounding_boxes[i]
                 px, py = refPt[0]
                 if x <= px <= x+w and y <= py <= y+h:
                     dragging_box = i
-
-            if sel_rect_endpoint and dragging_box != -1:
+            if dragging_box != -1 and sel_rect_endpoint:
                 rect_cpy = image.copy()
                 x, y, w, h = bounding_boxes[dragging_box]
-                x += sel_rect_endpoint[0][0] - refPt[0][0]
-                y += sel_rect_endpoint[0][1] - refPt[0][1]
+                dx = sel_rect_endpoint[0][0] - refPt[0][0]
+                dy = sel_rect_endpoint[0][1] - refPt[0][1]
+                if moving:
+                    x += dx
+                    y += dy
+                elif resizing:
+                    w += dx
+                    h += dy
                 cv2.rectangle(rect_cpy, (x, y), (x+w, y+h), (0, 0, 255), 1)
                 cv2.imshow("manual_edit", rect_cpy)
 
@@ -233,6 +255,7 @@ if __name__ == "__main__":
         except FileNotFoundError:
             start = True
 
+    mode = 'w' if start else 'a'
     filenames = []
     with open(dataset_path + "HandInfo.csv", newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
@@ -247,12 +270,11 @@ if __name__ == "__main__":
             elif file == last_labelled:
                 start = True
 
-    mode = 'w' if start else 'a'
     with open(output_path, mode, newline='') as csvfile:
         writer = csv.writer(csvfile, delimiter=',')
 
         print("q to quit, e to edit, any other key for next image")
-        print("editing mode: drag boxes with mouse. r to reset, enter to submit changes")
+        print("editing mode: left click to move, right click to resize, r to reset, enter to submit changes")
         for file in filenames:
             raw = cv2.imread(file)
             raw = utils.resize(raw, width=400)
