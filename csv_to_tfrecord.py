@@ -90,7 +90,7 @@ if __name__ == "__main__":
             raw = cv2.imread(file)
             bounding_boxes = []
             for box in np.reshape(row, [-1, 4]):
-                bounding_boxes.append(box)
+                bounding_boxes.append(box.astype(np.int))
 
             tf_example = create_tf_example(raw, file, bounding_boxes)
             example_list.append(tf_example)
