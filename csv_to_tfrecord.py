@@ -88,6 +88,7 @@ if __name__ == "__main__":
         for row in reader:
             file = row.pop(0)
             raw = cv2.imread(file)
+            raw = utils.resize(raw, width=400)
             bounding_boxes = []
             for box in np.reshape(row, [-1, 4]):
                 bounding_boxes.append(box.astype(np.int))
