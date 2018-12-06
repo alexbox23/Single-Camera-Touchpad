@@ -231,6 +231,8 @@ def manual_edit(image, bounding_boxes):
                 cv2.rectangle(image, (x, y), (x+w, y+h), (0, 0, 0), 1)
         elif key == 13: # enter key to finish
             break
+
+    cv2.destroyAllWindows()
     return bounding_boxes
 
 
@@ -273,7 +275,7 @@ if __name__ == "__main__":
     with open(output_path, mode, newline='') as csvfile:
         writer = csv.writer(csvfile, delimiter=',')
 
-        print("q to quit, e to edit, any other key for next image")
+        print("q to quit, e to edit, x to skip, any other key to submit and show next image")
         print("editing mode: left click to move, right click to resize, r to reset, enter to submit changes")
         for file in filenames:
             raw = cv2.imread(file)
@@ -288,10 +290,11 @@ if __name__ == "__main__":
             elif key == ord('e'):
                 bounding_boxes = manual_edit(raw, bounding_boxes)
 
-            row = [file]
-            for box in bounding_boxes:
-                row.extend(box)
-            writer.writerow(row)
+            if key != ord('x'):
+                row = [file]
+                for box in bounding_boxes:
+                    row.extend(box)
+                writer.writerow(row)
 
     print("saved labels in " + output_path)
 
