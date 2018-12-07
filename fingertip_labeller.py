@@ -295,6 +295,8 @@ if __name__ == "__main__":
                 for box in bounding_boxes:
                     row.extend(box)
                 writer.writerow(row)
+            else:
+                print("excluded " + file)
 
     print("saved labels in " + output_path)
 
