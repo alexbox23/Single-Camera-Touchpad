@@ -38,7 +38,12 @@ def find_fingertips(image, threshold=5, finger_angle=5, tip_radius=25):
     th, threshed = cv2.threshold(gray, 255-threshold, 255, cv2.THRESH_BINARY_INV|cv2.THRESH_OTSU)
 
     img, cnts, _ = cv2.findContours(threshed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    contours = sorted(cnts, key=cv2.contourArea, reverse=True)[:5]
+    contours = []
+    for c in cnts:
+        if cv2.arcLength(c, True) > 2 * np.pi * tip_radius:
+            contours.append(c)
+
+    # contours = sorted(cnts, key=cv2.contourArea, reverse=True)[:5]
     cv2.drawContours(image, contours, 0, (0, 0, 255), 1)
 
     contours = np.vstack(contours)
@@ -83,17 +88,18 @@ def find_fingertips(image, threshold=5, finger_angle=5, tip_radius=25):
                 candidates[check_id] = point
                 current_id = check_id
 
-        if d > longest_length:
+        if d > longest_length and (45 < t < 135):
             longest_length = d
             middle_finger = current_id
 
-    for i in range(current_id+1):
+    num_candidates = len(candidates.keys())
+    for i in range(num_candidates):
         tip = tuple(candidates[i])
         cv2.circle(image, tip, 2, (255, 0, 0), -1)
     
     fingertips = []
     for n in range(-2, 3):
-        finger_id = (middle_finger + n) % (current_id + 1)
+        finger_id = (middle_finger + n) % num_candidates
         fingertips.append(candidates[finger_id])
 
     cnt_indices = [[] for x in fingertips]
