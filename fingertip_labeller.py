@@ -229,6 +229,9 @@ def manual_edit(image, bounding_boxes):
             for box in bounding_boxes:
                 x, y, w, h = box
                 cv2.rectangle(image, (x, y), (x+w, y+h), (0, 0, 0), 1)
+        elif key == ord('x'):
+            bounding_boxes = []
+            break
         elif key == 13: # enter key to finish
             break
 
@@ -290,7 +293,7 @@ if __name__ == "__main__":
             elif key == ord('e'):
                 bounding_boxes = manual_edit(raw, bounding_boxes)
 
-            if key != ord('x'):
+            if key != ord('x') and len(bounding_boxes) > 0:
                 row = [file]
                 for box in bounding_boxes:
                     row.extend(box)
