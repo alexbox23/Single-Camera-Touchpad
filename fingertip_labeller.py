@@ -14,8 +14,7 @@ import random
 import numpy as np
 import cv2
 import tensorflow as tf
-
-import utils
+import imutils
 
 def find_fingertips(image, threshold=5, finger_angle=5, tip_radius=25):
     """ Returns candidate bounding boxes after pre-processing and convex hull calculations.
@@ -288,7 +287,7 @@ if __name__ == "__main__":
         print("editing mode: left click to move, right click to resize, r to reset, enter to submit changes")
         for file in filenames:
             raw = cv2.imread(file)
-            raw = utils.resize(raw, width=400)
+            raw = imutils.resize(raw, width=400)
             image, bounding_boxes = find_fingertips(raw)
 
             cv2.imshow(file, image)

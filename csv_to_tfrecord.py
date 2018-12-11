@@ -5,8 +5,24 @@ import random
 import numpy as np
 import cv2
 import tensorflow as tf
+import imutils
 
-import utils
+# Wrappers for inserting features into Example proto.
+# from tensorflow repo: object_detection/utils/dataset_util.py
+def int64_feature(value):
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+
+def int64_list_feature(value):
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
+
+def bytes_feature(value):
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+
+def bytes_list_feature(value):
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
+
+def float_list_feature(value):
+    return tf.train.Feature(float_list=tf.train.FloatList(value=value))
 
 def create_tf_example(image, file, bounding_boxes):
     """ Creates a tf.Example proto hand image.
@@ -38,18 +54,18 @@ def create_tf_example(image, file, bounding_boxes):
     classes = [1 for i in range(num_boxes)]
 
     tf_example = tf.train.Example(features=tf.train.Features(feature={
-        'image/height': utils.int64_feature(height),
-        'image/width': utils.int64_feature(width),
-        'image/filename': utils.bytes_feature(filename),
-        'image/source_id': utils.bytes_feature(filename),
-        'image/encoded': utils.bytes_feature(encoded_image_string),
-        'image/format': utils.bytes_feature(image_format),
-        'image/object/bbox/xmin': utils.float_list_feature(xmins),
-        'image/object/bbox/xmax': utils.float_list_feature(xmaxs),
-        'image/object/bbox/ymin': utils.float_list_feature(ymins),
-        'image/object/bbox/ymax': utils.float_list_feature(ymaxs),
-        'image/object/class/text': utils.bytes_list_feature(classes_text),
-        'image/object/class/label': utils.int64_list_feature(classes),
+        'image/height': int64_feature(height),
+        'image/width': int64_feature(width),
+        'image/filename': bytes_feature(filename),
+        'image/source_id': bytes_feature(filename),
+        'image/encoded': bytes_feature(encoded_image_string),
+        'image/format': bytes_feature(image_format),
+        'image/object/bbox/xmin': float_list_feature(xmins),
+        'image/object/bbox/xmax': float_list_feature(xmaxs),
+        'image/object/bbox/ymin': float_list_feature(ymins),
+        'image/object/bbox/ymax': float_list_feature(ymaxs),
+        'image/object/class/text': bytes_list_feature(classes_text),
+        'image/object/class/label': int64_list_feature(classes),
     }))
     return tf_example
 
@@ -88,7 +104,7 @@ if __name__ == "__main__":
         for row in reader:
             file = row.pop(0)
             raw = cv2.imread(file)
-            raw = utils.resize(raw, width=400)
+            raw = imutils.resize(raw, width=400)
             bounding_boxes = []
             for box in np.reshape(row, [-1, 4]):
                 bounding_boxes.append(box.astype(np.int))
