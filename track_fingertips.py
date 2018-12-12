@@ -1,94 +1,50 @@
 import argparse
 import time
+import csv
 
 import numpy as np
 import cv2
-import tensorflow as tf
 
 import imutils
 from imutils.video import FPS
 # comment out line below when not running on raspberry pi
 #from imutils.video.pivideostream import PiVideoStream 
 
-def run_inference_for_single_image(image, graph):
-    """ from tensorflow repo: object_detection/object_detection_tutorial.ipynb
-
-    Args:
-        image: The raw image opened via opencv.
-        graph: 
-
-    Returns:
-        output_dict: detection data
-    """
-    with graph.as_default():
-        with tf.Session() as sess:
-            # Get handles to input and output tensors
-            ops = tf.get_default_graph().get_operations()
-            all_tensor_names = {output.name for op in ops for output in op.outputs}
-            tensor_dict = {}
-            for key in [
-                'num_detections', 'detection_boxes', 'detection_scores',
-                'detection_classes', 'detection_masks'
-            ]:
-                tensor_name = key + ':0'
-                if tensor_name in all_tensor_names:
-                    tensor_dict[key] = tf.get_default_graph().get_tensor_by_name(tensor_name)
-            if 'detection_masks' in tensor_dict:
-                # The following processing is only for single image
-                detection_boxes = tf.squeeze(tensor_dict['detection_boxes'], [0])
-                detection_masks = tf.squeeze(tensor_dict['detection_masks'], [0])
-                # Reframe is required to translate mask from box coordinates to image coordinates and fit the image size.
-                real_num_detection = tf.cast(tensor_dict['num_detections'][0], tf.int32)
-                detection_boxes = tf.slice(detection_boxes, [0, 0], [real_num_detection, -1])
-                detection_masks = tf.slice(detection_masks, [0, 0, 0], [real_num_detection, -1, -1])
-                detection_masks_reframed = utils_ops.reframe_box_masks_to_image_masks(
-                    detection_masks, detection_boxes, image.shape[0], image.shape[1])
-                detection_masks_reframed = tf.cast(
-                    tf.greater(detection_masks_reframed, 0.5), tf.uint8)
-                # Follow the convention by adding back the batch dimension
-                tensor_dict['detection_masks'] = tf.expand_dims(
-                    detection_masks_reframed, 0)
-            image_tensor = tf.get_default_graph().get_tensor_by_name('image_tensor:0')
-
-            # Run inference
-            output_dict = sess.run(tensor_dict, feed_dict={image_tensor: np.expand_dims(image, 0)})
-
-            # all outputs are float32 numpy arrays, so convert types as appropriate
-            output_dict['num_detections'] = int(output_dict['num_detections'][0])
-            output_dict['detection_classes'] = output_dict['detection_classes'][0].astype(np.uint8)
-            output_dict['detection_boxes'] = output_dict['detection_boxes'][0]
-            output_dict['detection_scores'] = output_dict['detection_scores'][0]
-            if 'detection_masks' in output_dict:
-                output_dict['detection_masks'] = output_dict['detection_masks'][0]
-    return output_dict
+def adjust_gamma(image, gamma=0.8):
+    invGamma = 1.0 / gamma
+    table = np.array([((i / 255.0) ** invGamma) * 255
+        for i in np.arange(0, 256)]).astype("uint8")
+    return cv2.LUT(image, table)
 
 def detect_fingertip(frame, margin=5):
-    PATH_TO_FROZEN_GRAPH = "tensorflow/touch_inference_graph/frozen_inference_graph.pb"
-    detection_graph = tf.Graph()
-    with detection_graph.as_default():
-        od_graph_def = tf.GraphDef()
-        with tf.gfile.GFile(PATH_TO_FROZEN_GRAPH, 'rb') as fid:
-            serialized_graph = fid.read()
-            od_graph_def.ParseFromString(serialized_graph)
-            tf.import_graph_def(od_graph_def, name='')
+    print("[INFO] starting inference graph...")
+    frozen = "tensorflow/touch_inference_graph/frozen_inference_graph.pb"
+    text_graph = "tensorflow/graph.pbtxt"
+    cvNet = cv2.dnn.readNetFromTensorflow(frozen, text_graph)
 
-    image_np = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
-    image_np_expanded = np.expand_dims(image_np, axis=0)
-    # Actual detection.
-    output_dict = run_inference_for_single_image(image_np, detection_graph)
-    print("[INFO] detection score: " + str(output_dict['detection_scores'][0]))
+    img = imutils.resize(frame, width=400)
+    cvNet.setInput(cv2.dnn.blobFromImage(img, size=(400, 300), swapRB=True, crop=False))
+    cvOut = cvNet.forward()
 
-    ymin, xmin, ymax, xmax = output_dict['detection_boxes'][0]
-    xmin = int(xmin * width) - margin//2
-    ymin = int(ymin * height)
-    xmax = int(xmax * width) + margin//2
-    ymax = int(ymax * height) + margin
-    box = (xmin, ymin, xmax - xmin, ymax - ymin)
+    rows = img.shape[0]
+    cols = img.shape[1]
+    box = None
+    best_score = 0
+    for detection in cvOut[0,0,:,:]:
+        score = float(detection[2])
+        if score > 0.1 and score > best_score:
+            best_score = score
+            left = detection[3] * cols - margin//2
+            top = detection[4] * rows
+            right = detection[5] * cols + margin//2
+            bottom = detection[6] * rows + margin
+            box = (left, top, right - left, bottom - top)
 
+    print("[INFO] detection score: " + str(best_score))
     return box
 
 def calibrate_touch_color(roi):
+    print("[INFO] entering calibration mode...")
     cv2.namedWindow("Sliders")
     placeholder = np.zeros([1,500])
     channels = ["B", "G", "R"]
@@ -137,10 +93,20 @@ def calibrate_touch_color(roi):
 
 if __name__=="__main__":
     ap = argparse.ArgumentParser()
+    ap.add_argument("--display", dest="display", action='store_true')
+    ap.set_defaults(display=False)
     ap.add_argument("-v", "--video", type=str,
         help="path to input video file")
     ap.add_argument("-t", "--tracker", type=str, default="csrt",
         help="OpenCV object tracker type")
+    ap.add_argument("-o", "--output", required=True,
+        help="path to output video file")
+    ap.add_argument("-f", "--fps", type=int, default=4,
+        help="fps for saving video file")
+    ap.add_argument("-c", "--codec", type=str, default="MJPG",
+        help="codec of output video")
+    ap.add_argument("-d", "--data", type=str, required=True,
+        help="path to output csv file")
     args = ap.parse_args()
 
     OPENCV_OBJECT_TRACKERS = {
@@ -148,7 +114,6 @@ if __name__=="__main__":
         "kcf": cv2.TrackerKCF_create,
         "mosse": cv2.TrackerMOSSE_create
     }
-    trackers = cv2.MultiTracker_create()
 
     if not args.video:
         print("[INFO] starting rpi video stream...")
@@ -156,53 +121,111 @@ if __name__=="__main__":
         time.sleep(2.0)
     else:
         vs = cv2.VideoCapture(args.video)
+    fourcc = cv2.VideoWriter_fourcc(*args.codec)
+    writer = None
+
+    csvfile = open(args.data, 'w', newline='')
+    csvwriter = csv.writer(csvfile, delimiter=',')
+    csvwriter.writerow(["x", "y", "touch_count"])
 
     detected = False
     calibrated = False
+    touch_count = 0
+    headless_init = False
+    edit_flag = False
     while True:
-        frame = vs.read()
-        frame = frame[1] if args.video else frame
+        if not edit_flag:
+            frame = vs.read()
+            frame = frame[1] if args.video else frame
+        else:
+            edit_flag = False
         if frame is None:
             break
      
         frame = imutils.resize(frame, width=400)
+        frame = adjust_gamma(frame)
         height, width, _ = np.shape(frame)
-        (success, boxes) = trackers.update(frame)
-        for box in boxes:
+
+        if writer is None:
+            writer = cv2.VideoWriter(args.output, fourcc, args.fps, 
+                (width, height), True)
+
+        vis = np.copy(frame)
+        if detected:
+            (success, box) = tracker.update(frame)
             (x, y, w, h) = [int(v) for v in box]
-            roi = np.copy(frame[y:y+h, x:x+w])
-            cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+            if x >= 0 and y >= 0:
+                roi = np.copy(frame[y:y+h, x:x+h])
+            cv2.rectangle(vis, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
             if calibrated:
                 signal = cv2.inRange(roi, tuple(lows), tuple(highs))
                 touch_count = np.count_nonzero(signal)
-                print(touch_count)
 
-        cv2.imshow("Frame", frame)
-        key = cv2.waitKey(1) & 0xFF
-     
-        if key == ord("d"):
-            box = detect_fingertip(frame)
-            detected = True
+        if args.display:
+            cv2.imshow("Frame", vis)
+            key = cv2.waitKey(0) & 0xFF
+         
+            if key == ord("d"):
+                box = detect_fingertip(frame)
+                if box:
+                    tracker = OPENCV_OBJECT_TRACKERS[args.tracker]()
+                    tracker.init(frame, box)
+                    detected = True
+                else:
+                    print("[INFO] no fingertip detected")
 
-            tracker = OPENCV_OBJECT_TRACKERS[args.tracker]()
-            trackers.add(tracker, frame, box)
+            elif key == ord("c") and detected:
+                lows, highs = calibrate_touch_color(roi)
+                calibrated = True
+                lows = (35, 51, 80)
+                highs = (67, 81, 129)
+                fps = FPS().start()
 
-        elif key == ord("c") and detected:
-            lows, highs = calibrate_touch_color(roi)
-            calibrated = True
-            fps = FPS().start()
+            elif key == ord("s"):
+                box = cv2.selectROI("Frame", frame, fromCenter=False,
+                    showCrosshair=True)
+                tracker = OPENCV_OBJECT_TRACKERS[args.tracker]()
+                tracker.init(frame, box)
+                detected = True
+                edit_flag = True
 
-        elif key == ord("q"):
-            break
+            elif key == ord("q"):
+                break
+        else:
+            if not headless_init:
+                headless_init = True
+                headless_count = 0
+                box = detect_fingertip(frame)
+                if box:
+                    detected = True
+                    tracker = OPENCV_OBJECT_TRACKERS[args.tracker]()
+                    tracker.init(frame, box)
+                else:
+                    print("[INFO] no fingertip detected")
+                lows = [75, 70, 111]
+                highs = [111, 124, 171]
+                calibrated = True
+                fps = FPS().start()
+            headless_count += 1
+            if headless_count > 100:
+                break
 
         if calibrated:
             fps.update()
+
+        if not edit_flag:
+            writer.write(vis)
+            if detected and calibrated:
+                csvwriter.writerow([x+w//2, y+h, touch_count])
      
     if not args.video:
         vs.stop()
     else:
         vs.release()
+    writer.release()
+
+    csvfile.close()
 
     if calibrated:
         fps.stop()
