@@ -1,10 +1,4 @@
 # Single-Camera-Touchpad
 
-todo:
-
-export tfrecords
-train ssd_mobilenet on 11k hands
-KCF/MOSSE tracking
-calibration script for finger color
-ransac for homography
-final app
+[![smiley](http://img.youtube.com/vi/ZdTUgK25fyQ/0.jpg)](https://youtu.be/ZdTUgK25fyQ)
+[![smiley](http://img.youtube.com/vi/iNe2k8-xOqs/0.jpg)](https://youtu.be/iNe2k8-xOqs)
