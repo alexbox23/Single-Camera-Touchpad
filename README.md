@@ -2,7 +2,7 @@
 
 This project uses a single camera to convert an ordinary surface into a touch interface. Touch is registered by monitoring the user's blanch response. The color of the user's finger appears lighter when the finger is applying pressure on a surface.
 
-Detailed descriptions can be found in report.pdf
+Detailed descriptions can be found in report.pdf. Click on the images below to see demo videos.
 
 [![smiley](http://img.youtube.com/vi/ZdTUgK25fyQ/0.jpg)](https://youtu.be/ZdTUgK25fyQ)
 [![hi](http://img.youtube.com/vi/iNe2k8-xOqs/0.jpg)](https://youtu.be/iNe2k8-xOqs)
@@ -22,4 +22,4 @@ In order to train the neural network, clone the repo [tensorflow/models](https:/
 
 The main touch detection functionality is split between two scripts: track_fingertips.py and generate_touch_path.py. The homography and touch path visualization are separated from the actual detection and tracking because I could not get the framerate higher than 4 fps on the Raspberry Pi. A pre-recorded video can be used instead of the video stream from the Raspberry Pi. 
 
-Pull-requests are welcome. Some possible optimizations are mentioned in report.pdf
+Pull-requests are welcome. Some possible optimizations are mentioned in report.pdf.
